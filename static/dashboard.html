@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>小智伴学 · 仪表盘</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif; background: #f1f5f9; color: #1e293b; font-size: 14px; }
+    .app { display: flex; height: 100vh; }
+
+    /* Sidebar */
+    .sidebar { width: 240px; min-width: 240px; background: #0f172a; color: #fff; display: flex; flex-direction: column; }
+    .sidebar-brand { padding: 18px 16px; font-size: 16px; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 10px; }
+    .sidebar-brand .brand-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: #fff; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .sidebar-nav { padding: 8px; }
+    .sidebar-nav .item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 6px; font-size: 14px; color: rgba(255,255,255,0.6); cursor: pointer; margin-bottom: 2px; transition: all .15s; }
+    .sidebar-nav .item:hover { color: #fff; background: rgba(255,255,255,0.06); }
+    .sidebar-nav .item.active { color: #fff; background: #3b82f6; }
+    .sidebar-devices { padding: 8px; border-top: 1px solid rgba(255,255,255,0.08); flex: 1; overflow-y: auto; }
+    .sidebar-devices .sec-label { font-size: 11px; text-transform: uppercase; color: rgba(255,255,255,0.35); padding: 10px 10px 6px; letter-spacing: 0.5px; display: flex; justify-content: space-between; }
+    .sidebar-devices .dev-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; color: rgba(255,255,255,0.7); transition: all .15s; }
+    .sidebar-devices .dev-item:hover { background: rgba(255,255,255,0.06); color: #fff; }
+    .sidebar-devices .dev-item.active { background: rgba(59,130,246,0.2); color: #fff; }
+    .dev-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .dev-dot.online { background: #10b981; box-shadow: 0 0 4px rgba(16,185,129,0.4); }
+    .dev-dot.offline { background: #64748b; }
+    .dev-mini-state { font-size: 10px; margin-left: auto; opacity: 0.7; }
+    .sidebar-actions { padding: 8px; border-top: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-actions button { width: 100%; padding: 8px 10px; border-radius: 6px; border: none; font-size: 13px; cursor: pointer; margin-bottom: 4px; }
+    .btn-bind { background: #3b82f6; color: #fff; }
+    .btn-bind:hover { background: #2563eb; }
+    .btn-logout { background: transparent; color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.1) !important; }
+    .btn-logout:hover { color: #fff; background: rgba(255,255,255,0.05); }
+
+    /* Top bar */
+    .topbar { height: 48px; min-height: 48px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 24px; font-size: 14px; color: #64748b; }
+    .topbar .user-info { display: flex; align-items: center; gap: 6px; }
+    .topbar .avatar { width: 28px; height: 28px; background: #3b82f6; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; }
+    .topbar .last-update { font-size: 12px; }
+
+    /* Main content */
+    .main-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .main-content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+    /* Overview banner */
+    .overview-banner { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px 24px; margin-bottom: 16px; display: flex; align-items: center; gap: 32px; }
+    .overview-banner .ov-title { font-size: 13px; font-weight: 600; color: #475569; white-space: nowrap; }
+    .overview-banner .ov-items { display: flex; gap: 28px; flex-wrap: wrap; }
+    .overview-banner .ov-item { text-align: center; }
+    .overview-banner .ov-val { font-size: 22px; font-weight: 700; line-height: 1.1; }
+    .overview-banner .ov-lbl { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+    /* Alert banner */
+    .alert-banner { display: none; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; align-items: center; gap: 10px; }
+    .alert-banner.visible { display: flex; }
+    .alert-banner .alert-icon { font-size: 20px; }
+    .alert-banner .alert-text { flex: 1; font-size: 13px; color: #991b1b; }
+    .alert-banner .alert-close { cursor: pointer; color: #991b1b; font-size: 16px; background: none; border: none; }
+    .alert-banner.info { background: #eff6ff; border-color: #bfdbfe; }
+    .alert-banner.info .alert-text { color: #1e40af; }
+
+    /* Stats row */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+    .stat-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; display: flex; align-items: center; gap: 14px; transition: box-shadow 0.2s; }
+    .stat-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.04); }
+    .stat-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .stat-icon.online { background: #dcfce7; }
+    .stat-icon.alert { background: #fef2f2; }
+    .stat-icon.engaged { background: #ecfdf5; }
+    .stat-icon.update { background: #eff6ff; }
+    .stat-body { min-width: 0; }
+    .stat-card .stat-label { font-size: 12px; color: #64748b; margin-bottom: 2px; }
+    .stat-card .stat-value { font-size: 26px; font-weight: 700; line-height: 1.1; }
+    .stat-card .stat-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+
+    /* Filter bar */
+    .filter-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 16px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .filter-bar .fl-label { font-size: 13px; font-weight: 600; color: #475569; }
+    .filter-bar select { padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #334155; background: #fff; outline: none; }
+    .filter-bar select:focus { border-color: #3b82f6; }
+    .btn-sm { padding: 6px 16px; border-radius: 6px; border: none; font-size: 13px; cursor: pointer; font-weight: 500; }
+    .btn-primary { background: #3b82f6; color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-ghost { background: transparent; color: #3b82f6; }
+    .btn-ghost:hover { background: #eff6ff; }
+    .filter-spacer { flex: 1; }
+
+    /* Device cards grid */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .device-card { background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 18px; cursor: pointer; transition: all .2s; position: relative; overflow: hidden; }
+    .device-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
+    .device-card.selected { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+    .device-card.offline { opacity: 0.45; }
+    .device-card .card-state-bar { position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+    .card-state-bar.engaged { background: #10b981; }
+    .card-state-bar.thinking { background: #f59e0b; }
+    .card-state-bar.distracted { background: #ef4444; }
+    .card-state-bar.fatigued { background: #f97316; }
+    .card-state-bar.resting { background: #94a3b8; }
+    .card-state-bar.absent { background: #cbd5e1; }
+    .card-state-bar.unknown { background: #e2e8f0; }
+
+    .card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; margin-top: 4px; }
+    .card-device-info .dev-name { font-size: 16px; font-weight: 600; }
+    .card-device-info .dev-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .card-online-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+    .card-online-dot.online { background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5); }
+    .card-online-dot.offline { background: #cbd5e1; }
+
+    .card-state-main { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding: 14px; border-radius: 10px; background: #f8fafc; }
+    .card-state-main.engaged-bg { background: #ecfdf5; }
+    .card-state-main.thinking-bg { background: #fffbeb; }
+    .card-state-main.distracted-bg { background: #fef2f2; }
+    .card-state-main.fatigued-bg { background: #fff7ed; }
+    .card-state-main.resting-bg { background: #f8fafc; }
+    .card-state-main.absent-bg { background: #f1f5f9; }
+    .card-state-emoji { font-size: 36px; line-height: 1; }
+    .card-state-text .state-label { font-size: 18px; font-weight: 700; }
+    .card-state-text .state-detail { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+    .card-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+    .card-metric { text-align: center; padding: 8px 4px; border-radius: 6px; background: #f8fafc; }
+    .card-metric .val { font-size: 15px; font-weight: 700; }
+    .card-metric .lbl { font-size: 11px; color: #94a3b8; margin-top: 1px; }
+    .val.high { color: #dc2626; }
+    .val.mid { color: #d97706; }
+    .val.low { color: #16a34a; }
+
+    .card-indicators { display: flex; gap: 10px; font-size: 11px; }
+    .card-indicators .ind { display: flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 10px; }
+    .ind.speaking { background: #ede9fe; color: #7c3aed; }
+    .ind.present { background: #dcfce7; color: #16a34a; }
+    .ind.gone { background: #fee2e2; color: #dc2626; }
+    .ind .ind-dot { width: 5px; height: 5px; border-radius: 50%; }
+    .ind.speaking .ind-dot { background: #7c3aed; }
+    .ind.present .ind-dot { background: #16a34a; }
+    .ind.gone .ind-dot { background: #dc2626; }
+
+    /* Empty */
+    .no-match { grid-column: 1 / -1; text-align: center; color: #94a3b8; padding: 60px; font-size: 14px; }
+    .no-match .empty-icon { font-size: 56px; margin-bottom: 16px; opacity: 0.6; }
+    .no-match .empty-title { font-size: 16px; font-weight: 600; color: #64748b; margin-bottom: 8px; }
+    .no-match .empty-hint { font-size: 13px; color: #94a3b8; line-height: 1.8; }
+
+    /* Detail panel */
+    .detail-panel { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px; display: none; }
+    .detail-panel.visible { display: block; }
+    .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .detail-header h4 { font-size: 15px; color: #475569; }
+    .detail-chart-wrap { height: 280px; margin-bottom: 10px; }
+    .detail-link { text-align: right; font-size: 13px; }
+    .detail-link a { color: #3b82f6; text-decoration: none; font-weight: 500; }
+    .detail-link a:hover { text-decoration: underline; }
+
+    /* Alerts log in detail */
+    .detail-alerts { margin-top: 12px; }
+    .detail-alerts h4 { font-size: 13px; color: #64748b; margin-bottom: 8px; }
+    .alert-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; margin-bottom: 4px; font-size: 12px; }
+    .alert-item.distracted { background: #fef2f2; color: #991b1b; }
+    .alert-item.fatigued { background: #fff7ed; color: #c2410c; }
+    .alert-item .alert-ts { color: #94a3b8; font-size: 11px; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: #fff; border-radius: 14px; padding: 24px; width: 400px; box-shadow: 0 12px 40px rgba(0,0,0,0.15); }
+    .modal h3 { font-size: 17px; margin-bottom: 16px; }
+    .modal .field { margin-bottom: 12px; }
+    .modal .field label { display: block; font-size: 13px; color: #475569; margin-bottom: 4px; }
+    .modal .field input { width: 100%; padding: 9px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; outline: none; }
+    .modal .field input:focus { border-color: #3b82f6; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .btn-cancel { padding: 8px 16px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; font-size: 13px; cursor: pointer; color: #475569; }
+    .btn-cancel:hover { background: #f8fafc; }
+
+    /* Agent Panel */
+    .agent-header { padding: 0 0 14px; border-bottom: 1px solid #e2e8f0; margin-bottom: 0; display: flex; justify-content: space-between; align-items: center; }
+    .agent-header h3 { font-size: 17px; font-weight: 600; }
+    .agent-cards { padding: 14px 0; border-bottom: 1px solid #e2e8f0; margin-bottom: 8px; animation: fadeIn .3s; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    .agent-summary-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+    .agent-stat { background: #f8fafc; border-radius: 10px; padding: 12px; text-align: center; }
+    .agent-stat-val { font-size: 22px; font-weight: 700; color: #1e293b; }
+    .agent-stat-lbl { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .agent-insight { background: #eff6ff; border-radius: 10px; padding: 14px 16px; }
+    .agent-insight .ai-title { font-size: 13px; font-weight: 600; color: #1e40af; margin-bottom: 8px; }
+    .agent-insight .ai-line { font-size: 13px; color: #334155; line-height: 1.8; padding: 3px 0; }
+    .agent-insight .ai-line.risk { color: #dc2626; }
+    .agent-insight .ai-line.good { color: #16a34a; }
+    .agent-chat { flex: 1; overflow-y: auto; padding: 20px 0; display: flex; flex-direction: column; gap: 18px; background: #f8fafc; margin: 0 -24px; padding: 20px 24px; }
+    .agent-msg { display: flex; gap: 10px; max-width: 80%; align-items: flex-start; }
+    .agent-msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .agent-msg.assistant { align-self: flex-start; }
+    .agent-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .agent-msg.user .agent-avatar { background: #dbeafe; }
+    .agent-msg.assistant .agent-avatar { background: #e2e8f0; }
+    .agent-bubble { padding: 10px 14px; border-radius: 14px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; position: relative; }
+    .agent-msg.user .agent-bubble { background: #3b82f6; color: #fff; border-bottom-right-radius: 4px; }
+    .agent-msg.assistant .agent-bubble { background: #fff; color: #334155; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .agent-msg .agent-time { font-size: 10px; color: #94a3b8; margin-top: 4px; }
+    .agent-msg.user .agent-time { text-align: right; }
+    .agent-input-row { display: flex; gap: 8px; padding-top: 12px; border-top: 1px solid #e2e8f0; margin-top: 0; }
+    .agent-input-row input { flex: 1; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 20px; font-size: 13px; outline: none; background: #f1f5f9; }
+    .agent-input-row input:focus { border-color: #3b82f6; background: #fff; }
+    .agent-input-row button { padding: 10px 22px; background: #3b82f6; color: #fff; border: none; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .agent-input-row button:hover { background: #2563eb; }
+    .agent-typing { align-self: flex-start; padding: 12px 16px; background: #fff; border-radius: 14px; border-bottom-left-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); margin-left: 42px; }
+    .agent-typing span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #94a3b8; animation: agentDot 1.4s infinite; margin: 0 3px; }
+    .agent-typing span:nth-child(2) { animation-delay: 0.2s; }
+    .agent-typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes agentDot { 0%,60%,100% { opacity: 0.2; } 30% { opacity: 1; } }
+
+    @media (max-width: 768px) {
+      .sidebar { width: 60px; min-width: 60px; }
+      .sidebar-brand { font-size: 0; padding: 12px; justify-content: center; }
+      .sidebar-nav .item span:not(.item-icon) { display: none; }
+      .sidebar-devices .sec-label { display: none; }
+      .cards-grid { grid-template-columns: 1fr; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-brand"><span class="brand-icon">🎓</span> 小智伴学</div>
+    <div class="sidebar-nav" id="sidebarNav">
+      <div class="item active" data-page="dashboard"><span class="item-icon">📊</span> 仪表盘</div>
+      <div class="item" data-page="agent"><span class="item-icon">🤖</span> 学习助手</div>
+    </div>
+    <div class="sidebar-devices">
+      <div class="sec-label"><span>设备列表</span><span id="sidebarCount">0</span></div>
+      <div id="deviceList"></div>
+    </div>
+    <div class="sidebar-actions">
+      <button class="btn-bind" id="bindBtn">+ 绑定设备</button>
+      <button class="btn-logout" id="logoutBtn">退出登录</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-wrap">
+    <div class="topbar">
+      <span>📋 实时监测 · 小智伴学</span>
+      <span class="user-info"><span class="avatar">A</span> admin <span class="last-update" id="topUpdate"></span></span>
+    </div>
+    <div class="main-content" id="mainContent">
+      <!-- Overview banner -->
+      <div class="overview-banner" id="overviewBanner">
+        <span class="ov-title">📅 今日概览</span>
+        <div class="ov-items">
+          <div class="ov-item"><div class="ov-val" id="ovDevices">--</div><div class="ov-lbl">活跃设备</div></div>
+          <div class="ov-item"><div class="ov-val" id="ovMinutes" style="color:#3b82f6;">--</div><div class="ov-lbl">学习时长(分)</div></div>
+          <div class="ov-item"><div class="ov-val" id="ovSessions">--</div><div class="ov-lbl">学习时段</div></div>
+          <div class="ov-item"><div class="ov-val" id="ovFocus" style="color:#16a34a;">--</div><div class="ov-lbl">专注率</div></div>
+          <div class="ov-item"><div class="ov-val" id="ovAlerts" style="color:#dc2626;">--</div><div class="ov-lbl">告警次数</div></div>
+        </div>
+      </div>
+
+      <!-- Alert banner -->
+      <div class="alert-banner" id="alertBanner">
+        <span class="alert-icon">🚨</span>
+        <span class="alert-text" id="alertText"></span>
+        <button class="alert-close" onclick="dismissAlert()">&times;</button>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-icon online">🟢</div>
+          <div class="stat-body"><div class="stat-label">在线设备</div><div class="stat-value" id="statOnline">0</div><div class="stat-sub" id="statTotal">共 0 台</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon alert">⚠️</div>
+          <div class="stat-body"><div class="stat-label">当前告警</div><div class="stat-value" id="statAlerts" style="color:#dc2626;">0</div><div class="stat-sub">需关注</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon engaged">✅</div>
+          <div class="stat-body"><div class="stat-label">专注学习</div><div class="stat-value" id="statEngaged" style="color:#16a34a;">0</div><div class="stat-sub">认真状态</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon update">🕐</div>
+          <div class="stat-body"><div class="stat-label">最近更新</div><div class="stat-value" id="statUpdate" style="font-size:16px;">--</div><div class="stat-sub" id="statRefresh">自动刷新中</div></div>
+        </div>
+      </div>
+
+      <!-- Filter -->
+      <div class="filter-bar">
+        <span class="fl-label">筛选</span>
+        <select id="flDevice"><option value="">全部设备</option></select>
+        <select id="flState"><option value="">全部状态</option></select>
+        <button class="btn-sm btn-primary" id="filterBtn">查询</button>
+        <span class="filter-spacer"></span>
+        <button class="btn-sm btn-ghost" id="resetBtn">重置</button>
+      </div>
+
+      <!-- Cards -->
+      <div class="cards-grid" id="cardsGrid"></div>
+
+      <!-- Detail -->
+      <div class="detail-panel" id="detailPanel">
+        <div class="detail-header">
+          <h4 id="detailTitle">设备详情</h4>
+          <button class="btn-sm btn-ghost" id="detailClose" style="font-size:12px;">收起</button>
+        </div>
+        <div class="detail-chart-wrap"><canvas id="detailChart"></canvas></div>
+        <div class="detail-alerts" id="detailAlerts"></div>
+        <div class="detail-link"><a href="#" id="detailSessionLink">查看完整时段 →</a></div>
+      </div>
+    </div>
+
+    <!-- Agent Panel (hidden by default) -->
+    <div class="main-content" id="agentPanel" style="display:none; flex-direction:column;">
+      <div class="agent-header">
+        <div>
+          <h3>🤖 学习助手</h3>
+          <span style="font-size:12px;color:#94a3b8;">DeepSeek · 结构化行为分析 + 智能对话</span>
+        </div>
+        <button class="btn-sm btn-primary" id="agentAnalyzeBtn" style="flex-shrink:0;">📊 分析学习状态</button>
+      </div>
+
+      <!-- 分析结果卡片 -->
+      <div class="agent-cards" id="agentCards" style="display:none;">
+        <div class="agent-summary-row">
+          <div class="agent-stat"><div class="agent-stat-val" id="asFocus">--</div><div class="agent-stat-lbl">专注率</div></div>
+          <div class="agent-stat"><div class="agent-stat-val" id="asFatigue">--</div><div class="agent-stat-lbl">平均疲劳</div></div>
+          <div class="agent-stat"><div class="agent-stat-val" id="asDistraction">--</div><div class="agent-stat-lbl">平均分心</div></div>
+          <div class="agent-stat"><div class="agent-stat-val" id="asDuration">--</div><div class="agent-stat-lbl">分析时长(分)</div></div>
+        </div>
+        <div class="agent-insight" id="agentInsight"></div>
+      </div>
+
+      <!-- 对话区 -->
+      <div class="agent-chat" id="agentChat">
+        <div class="agent-msg assistant">
+          <div class="agent-avatar">🤖</div>
+          <div>
+            <div class="agent-bubble">你好！我不仅能聊天，还能分析你的学习行为 👋<br><br>点击上方 <b>📊 分析学习状态</b> 按钮<br>我会基于实时行为数据生成结构化报告<br><br>也可以直接问我问题~</div>
+            <div class="agent-time">刚刚</div>
+          </div>
+        </div>
+      </div>
+      <div class="agent-input-row">
+        <input type="text" id="agentInput" placeholder="问我任何关于学习的问题..." />
+        <button id="agentSend">发送</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bind Modal -->
+<div class="modal-overlay" id="bindModal">
+  <div class="modal">
+    <h3>绑定新设备</h3>
+    <div class="field"><label>设备ID</label><input type="text" id="bindDeviceId" placeholder="设备唯一标识（UUID）"></div>
+    <div class="field"><label>设备名称</label><input type="text" id="bindDeviceName" placeholder="给设备起个名字"></div>
+    <div class="field"><label>绑定码（留空自动生成）</label><input type="text" id="bindCode" placeholder="4位绑定码"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="bindCancel">取消</button>
+      <button class="btn-sm btn-primary" id="bindSubmit">绑定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const token = localStorage.getItem('token');
+if (!token) { window.location.href = '/static/login.html'; }
+
+let allDevices = [], statuses = {}, currentDevice = null, chart = null, pollTimer = null;
+
+// --- Learning state display mapping ---
+const STATE_MAP = {
+  engaged_screen:   { label: '认真听课中',   emoji: '😊', cls: 'engaged',    bg: 'engaged-bg',    color: '#10b981' },
+  engaged_writing:  { label: '正在写字',     emoji: '✍️', cls: 'engaged',    bg: 'engaged-bg',    color: '#10b981' },
+  engaged_reading:  { label: '专注阅读中',   emoji: '📖', cls: 'engaged',    bg: 'engaged-bg',    color: '#10b981' },
+  thinking:         { label: '思考中',       emoji: '🤔', cls: 'thinking',   bg: 'thinking-bg',   color: '#f59e0b' },
+  distracted_phone: { label: '在玩手机!',    emoji: '📱', cls: 'distracted', bg: 'distracted-bg', color: '#ef4444' },
+  distracted_away:  { label: '注意力分散',   emoji: '👀', cls: 'distracted', bg: 'distracted-bg', color: '#ef4444' },
+  fatigued:         { label: '看起来累了',   emoji: '😴', cls: 'fatigued',   bg: 'fatigued-bg',   color: '#f97316' },
+  resting:          { label: '正在休息',     emoji: '💤', cls: 'resting',    bg: 'resting-bg',    color: '#94a3b8' },
+  absent:           { label: '离开座位',     emoji: '🚶', cls: 'absent',     bg: 'absent-bg',     color: '#cbd5e1' },
+};
+const ALERT_STATES = ['distracted_phone', 'distracted_away', 'fatigued'];
+
+function getStateInfo(ls) { return STATE_MAP[ls] || { label: ls || '等待数据...', emoji: '⏳', cls: 'unknown', bg: '', color: '#94a3b8' }; }
+
+// --- API ---
+async function api(url, opts = {}) {
+  const res = await fetch(url, { ...opts, headers: { ...opts.headers, 'Authorization': `Bearer ${token}` } });
+  if (res.status === 401) { localStorage.removeItem('token'); window.location.href = '/static/login.html'; }
+  return res.json();
+}
+
+async function loadOverview() {
+  try {
+    const ov = await api('/api/overview/today');
+    document.getElementById('ovDevices').textContent = ov.active_devices;
+    document.getElementById('ovMinutes').textContent = ov.total_minutes;
+    document.getElementById('ovSessions').textContent = ov.total_sessions;
+    document.getElementById('ovFocus').textContent = ov.focus_rate + '%';
+    document.getElementById('ovAlerts').textContent = ov.alert_count;
+  } catch(e) { /* overview unavailable */ }
+}
+
+async function loadDevices() {
+  allDevices = await api('/api/devices');
+  renderFilterOptions();
+  loadOverview();
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(pollAll, 5000);
+  pollAll();
+}
+
+function renderSidebar() {
+  const el = document.getElementById('deviceList');
+  document.getElementById('sidebarCount').textContent = allDevices.length;
+  el.innerHTML = allDevices.map(d => {
+    const s = statuses[d.device_id];
+    const online = s?.online;
+    const ls = s?.summary?.learning_state || '';
+    const si = getStateInfo(ls);
+    return `<div class="dev-item${currentDevice === d.device_id ? ' active' : ''}" data-did="${d.device_id}" onclick="selectDevice('${d.device_id}')">
+      <span class="dev-dot ${online ? 'online' : 'offline'}"></span>${d.name || d.device_id}
+      ${online && ls ? `<span class="dev-mini-state">${si.emoji}</span>` : ''}
+    </div>`;
+  }).join('') || '<div style="font-size:11px;color:rgba(255,255,255,0.3);padding:8px;">暂无设备</div>';
+}
+
+function renderFilterOptions() {
+  const sel = document.getElementById('flDevice');
+  sel.innerHTML = '<option value="">全部设备</option>' + allDevices.map(d => `<option value="${d.device_id}">${d.name || d.device_id}</option>`).join('');
+  const stSel = document.getElementById('flState');
+  stSel.innerHTML = '<option value="">全部状态</option>' + Object.entries(STATE_MAP).map(([k,v]) => `<option value="${k}">${v.emoji} ${v.label}</option>`).join('');
+}
+
+async function pollAll() {
+  loadOverview();  // 更新今日概览
+  if (!allDevices.length) return;
+  const results = await Promise.all(allDevices.map(d => api(`/api/realtime/${d.device_id}`).catch(() => ({online:false,summary:{}}))));
+  allDevices.forEach((d, i) => { statuses[d.device_id] = results[i]; });
+  renderSidebar();
+  renderCards();
+  if (currentDevice) updateDetail();
+  document.getElementById('topUpdate').textContent = '更新 ' + new Date().toLocaleTimeString();
+}
+
+// --- Filters ---
+function applyFilters() {
+  const fDev = document.getElementById('flDevice').value;
+  const fState = document.getElementById('flState').value;
+  return allDevices.filter(d => {
+    if (fDev && d.device_id !== fDev) return false;
+    if (fState) {
+      const s = statuses[d.device_id];
+      if (!s?.summary?.learning_state || s.summary.learning_state !== fState) return false;
+    }
+    return true;
+  });
+}
+
+// --- Render cards ---
+function renderCards() {
+  const filtered = applyFilters();
+  const grid = document.getElementById('cardsGrid');
+
+  let onlineCount = 0, alertCount = 0, engagedCount = 0;
+  let latestAlertDev = null, latestAlertInfo = null;
+
+  allDevices.forEach(d => {
+    const s = statuses[d.device_id];
+    if (s?.online) {
+      onlineCount++;
+      const ls = s.summary?.learning_state || '';
+      if (ls.startsWith('engaged')) engagedCount++;
+      if (ALERT_STATES.includes(ls)) {
+        alertCount++;
+        if (!latestAlertDev) { latestAlertDev = d; latestAlertInfo = getStateInfo(ls); }
+      }
+    }
+  });
+
+  document.getElementById('statOnline').textContent = onlineCount;
+  document.getElementById('statTotal').textContent = `共 ${allDevices.length} 台`;
+  document.getElementById('statAlerts').textContent = alertCount;
+  document.getElementById('statEngaged').textContent = engagedCount;
+  document.getElementById('statUpdate').textContent = new Date().toLocaleTimeString();
+
+  // Alert banner
+  const banner = document.getElementById('alertBanner');
+  if (alertCount > 0 && latestAlertInfo) {
+    banner.classList.add('visible');
+    banner.classList.remove('info');
+    document.getElementById('alertText').textContent =
+      `设备「${latestAlertDev.name || latestAlertDev.device_id}」${latestAlertInfo.label}${latestAlertInfo.emoji} — 共 ${alertCount} 台设备有告警`;
+  } else if (onlineCount === 0 && allDevices.length > 0) {
+    banner.classList.add('visible', 'info');
+    document.getElementById('alertText').textContent = '所有设备均已离线，请检查设备连接';
+  } else {
+    banner.classList.remove('visible');
+  }
+
+  grid.innerHTML = filtered.map(d => {
+    const s = statuses[d.device_id];
+    const online = s?.online;
+    const sm = (s?.summary && Object.keys(s.summary).length) ? s.summary : null;
+    const ls = sm?.learning_state || '';
+    const si = getStateInfo(ls);
+    const fat = sm ? sm.avg_fatigue : null;
+    const dis = sm ? sm.avg_distraction : null;
+    const dif = sm ? sm.avg_difficulty : null;
+    const personPresent = sm?.person_present !== false;
+    const speaking = sm?.vad_speaking_pct > 0.15;
+    const sscmaScore = sm?.sscma_person_score || 0;
+
+    const fatClass = fat !== null && fat > 0.5 ? 'high' : (fat !== null && fat > 0.3 ? 'mid' : 'low');
+    const disClass = dis !== null && dis > 0.5 ? 'high' : (dis !== null && dis > 0.3 ? 'mid' : 'low');
+    const difClass = dif !== null && dif > 0.5 ? 'high' : (dif !== null && dif > 0.3 ? 'mid' : 'low');
+
+    let elapsedStr = '';
+    if (s?.session_start) {
+      const elapsed = Math.floor((Date.now() - new Date(s.session_start).getTime()) / 60000);
+      elapsedStr = elapsed > 0 ? ` · 已学${elapsed}分钟` : ' · 刚刚开始';
+    }
+
+    return `<div class="device-card ${online ? '' : 'offline'}${currentDevice===d.device_id?' selected':''}" onclick="selectDevice('${d.device_id}')">
+      <div class="card-state-bar ${si.cls}"></div>
+      <div class="card-top">
+        <div class="card-device-info">
+          <div class="dev-name">${d.name || d.device_id}</div>
+          <div class="dev-meta">${online ? (personPresent ? '人员在位' + elapsedStr : '人员离开中') : '离线'}</div>
+        </div>
+        <div class="card-online-dot ${online ? 'online' : 'offline'}"></div>
+      </div>
+      <div class="card-state-main ${si.bg}">
+        <div class="card-state-emoji">${si.emoji}</div>
+        <div class="card-state-text">
+          <div class="state-label" style="color:${si.color}">${si.label}</div>
+          <div class="state-detail">${online ? (sm ? `动作: ${sm.current_action} · 注视: ${sm.current_gaze}` : '等待数据...') : '设备离线'}</div>
+        </div>
+      </div>
+      <div class="card-metrics">
+        <div class="card-metric"><div class="val ${fatClass}">${fat!==null?fat.toFixed(2):'--'}</div><div class="lbl">疲劳度</div></div>
+        <div class="card-metric"><div class="val ${disClass}">${dis!==null?dis.toFixed(2):'--'}</div><div class="lbl">分心度</div></div>
+        <div class="card-metric"><div class="val ${difClass}">${dif!==null?dif.toFixed(2):'--'}</div><div class="lbl">困难度</div></div>
+      </div>
+      <div class="card-indicators">
+        <span class="ind ${personPresent ? 'present' : 'gone'}"><span class="ind-dot"></span>${personPresent ? '在位' : '离开'}</span>
+        ${speaking ? '<span class="ind speaking"><span class="ind-dot"></span>说话中</span>' : ''}
+      </div>
+    </div>`;
+  }).join('') || (allDevices.length === 0
+      ? '<div class="no-match"><div class="empty-icon">📡</div><div class="empty-title">等待设备连接</div><div class="empty-hint">请确保小智设备已开机并连接到服务器<br>设备上线后将自动出现在这里</div></div>'
+      : '<div class="no-match"><div class="empty-icon">🔍</div><div class="empty-title">没有匹配的设备</div><div class="empty-hint">尝试调整筛选条件查看更多设备</div></div>');
+}
+
+function selectDevice(did) {
+  if (currentDevice === did) { currentDevice = null; }
+  else { currentDevice = did; }
+  renderSidebar();
+  renderCards();
+  if (currentDevice) updateDetail();
+  else document.getElementById('detailPanel').classList.remove('visible');
+}
+
+function updateDetail() {
+  if (!currentDevice) return;
+  const s = statuses[currentDevice];
+  if (!s || !s.summary || !Object.keys(s.summary).length) {
+    document.getElementById('detailPanel').classList.remove('visible');
+    return;
+  }
+  const panel = document.getElementById('detailPanel');
+  panel.classList.add('visible');
+  document.getElementById('detailTitle').textContent = `${currentDevice} · 近10分钟趋势`;
+  const link = document.getElementById('detailSessionLink');
+  link.href = s.session_id ? `/static/session.html?id=${s.session_id}` : '#';
+  link.style.display = s.session_id ? '' : 'none';
+
+  // Trend chart
+  const canvas = document.getElementById('detailChart');
+  if (!canvas) return;
+  if (chart) chart.destroy();
+
+  const trend = s.trend || [];
+  const labels = trend.map(p => new Date(p.timestamp).toLocaleTimeString());
+  const fatigueData = trend.map(p => p.fatigue);
+  const distractionData = trend.map(p => p.distraction);
+  const difficultyData = trend.map(p => p.difficulty);
+
+  chart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: labels.length ? labels : [new Date().toLocaleTimeString()],
+      datasets: [
+        { label: '疲劳', data: fatigueData.length ? fatigueData : [s.summary.avg_fatigue], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.06)', tension: 0.3, fill: true, pointRadius: 0 },
+        { label: '分心', data: distractionData.length ? distractionData : [s.summary.avg_distraction], borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.06)', tension: 0.3, fill: true, pointRadius: 0 },
+        { label: '困难', data: difficultyData.length ? difficultyData : [s.summary.avg_difficulty], borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.06)', tension: 0.3, fill: true, pointRadius: 0 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { min: 0, max: 1.2, grid: { color: '#f1f5f9' } } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+      interaction: { intersect: false, mode: 'index' },
+    }
+  });
+
+  // Alerts log
+  const alertsDiv = document.getElementById('detailAlerts');
+  const alerts = s.alerts || [];
+  const alertLabels = {
+    distracted_phone: '玩手机', distracted_away: '分心', fatigued: '疲劳'
+  };
+  if (alerts.length) {
+    alertsDiv.innerHTML = '<h4>📢 最近告警记录</h4>' + alerts.map(a => {
+      const start = new Date(a.start_time).toLocaleTimeString();
+      const dur = a.duration_s >= 60 ? `${Math.floor(a.duration_s/60)}分${a.duration_s%60}秒` : `${a.duration_s}秒`;
+      return `
+      <div class="alert-item ${a.learning_state.startsWith('distracted') ? 'distracted' : 'fatigued'}">
+        <span>${a.learning_state.startsWith('distracted') ? '⚠️' : '🔔'}</span>
+        <span>${alertLabels[a.learning_state] || a.learning_state}</span>
+        <span class="alert-ts">${start} · 持续${dur}</span>
+        <span style="margin-left:auto;opacity:0.7;">疲劳${a.avg_fatigue?.toFixed(2)} · 分心${a.avg_distraction?.toFixed(2)}</span>
+      </div>`;
+    }).join('');
+  } else {
+    alertsDiv.innerHTML = '<h4>📢 最近告警记录</h4><div style="font-size:12px;color:#94a3b8;padding:8px;">近10分钟无告警 ✅</div>';
+  }
+}
+
+// --- Event handlers ---
+document.getElementById('filterBtn').onclick = renderCards;
+document.getElementById('resetBtn').onclick = () => {
+  document.getElementById('flDevice').value = '';
+  document.getElementById('flState').value = '';
+  renderCards();
+};
+document.getElementById('detailClose').onclick = () => {
+  currentDevice = null;
+  document.getElementById('detailPanel').classList.remove('visible');
+  renderSidebar();
+  renderCards();
+};
+
+function dismissAlert() { document.getElementById('alertBanner').classList.remove('visible'); }
+
+document.getElementById('bindBtn').onclick = () => document.getElementById('bindModal').classList.add('open');
+document.getElementById('bindCancel').onclick = () => document.getElementById('bindModal').classList.remove('open');
+document.getElementById('bindSubmit').onclick = async () => {
+  const deviceId = document.getElementById('bindDeviceId').value.trim();
+  const name = document.getElementById('bindDeviceName').value.trim();
+  const code = document.getElementById('bindCode').value.trim();
+  if (!deviceId) return alert('请输入设备ID');
+  const res = await api('/api/devices/bind', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({device_id:deviceId,name,bind_code:code}) });
+  if (res.bind_code) alert(`绑定成功！绑定码: ${res.bind_code}`);
+  else if (res.status === 'ok') alert('绑定成功');
+  document.getElementById('bindModal').classList.remove('open');
+  loadDevices();
+};
+document.getElementById('logoutBtn').onclick = () => { localStorage.removeItem('token'); window.location.href = '/static/login.html'; };
+
+loadDevices();
+
+// --- Tab switching ---
+document.querySelectorAll('#sidebarNav .item').forEach(item => {
+  item.addEventListener('click', function() {
+    document.querySelectorAll('#sidebarNav .item').forEach(i => i.classList.remove('active'));
+    this.classList.add('active');
+    const page = this.dataset.page;
+    document.getElementById('mainContent').style.display = page === 'dashboard' ? '' : 'none';
+    document.getElementById('agentPanel').style.display = page === 'agent' ? 'flex' : 'none';
+  });
+});
+
+// --- Agent chat ---
+const agentChat = document.getElementById('agentChat');
+const agentInput = document.getElementById('agentInput');
+const agentSend = document.getElementById('agentSend');
+
+function addAgentMsg(role, text) {
+  const now = new Date().toLocaleTimeString();
+  const avatar = role === 'user' ? '👤' : '🤖';
+  const div = document.createElement('div');
+  div.className = 'agent-msg ' + role;
+  div.innerHTML = `<div class="agent-avatar">${avatar}</div>
+    <div>
+      <div class="agent-bubble">${text}</div>
+      <div class="agent-time">${now}</div>
+    </div>`;
+  agentChat.appendChild(div);
+  agentChat.scrollTop = agentChat.scrollHeight;
+}
+
+function showTyping() {
+  const div = document.createElement('div');
+  div.className = 'agent-typing';
+  div.id = 'agentTyping';
+  div.innerHTML = '<span></span><span></span><span></span>';
+  agentChat.appendChild(div);
+  agentChat.scrollTop = agentChat.scrollHeight;
+}
+
+function hideTyping() {
+  const el = document.getElementById('agentTyping');
+  if (el) el.remove();
+}
+
+async function sendAgent() {
+  const q = agentInput.value.trim();
+  if (!q) return;
+  addAgentMsg('user', q);
+  agentInput.value = '';
+  showTyping();
+  try {
+    const res = await api('/api/agent/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: q })
+    });
+    hideTyping();
+    addAgentMsg('assistant', res.reply || res.message || '抱歉，暂时无法回复。');
+  } catch(e) {
+    hideTyping();
+    addAgentMsg('assistant', '网络错误，请稍后再试。');
+  }
+}
+
+agentSend.addEventListener('click', sendAgent);
+agentInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendAgent(); });
+
+// --- Agent: 结构化行为分析 ---
+document.getElementById('agentAnalyzeBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('agentAnalyzeBtn');
+  btn.textContent = '⏳ 分析中...';
+  btn.disabled = true;
+  try {
+    const res = await api('/api/agent/analyze');
+    const cards = document.getElementById('agentCards');
+    const sm = res.summary || {};
+    const an = res.analysis || {};
+
+    if (!res.has_data) {
+      addAgentMsg('assistant', '还没有学习行为数据，等设备连接并开始监测后再来分析吧~');
+    } else {
+      // 统计卡片
+      document.getElementById('asFocus').textContent = sm.focus_pct + '%';
+      document.getElementById('asFatigue').textContent = sm.avg_fatigue?.toFixed(2);
+      document.getElementById('asDistraction').textContent = sm.avg_distraction?.toFixed(2);
+      document.getElementById('asDuration').textContent = sm.duration_min || '--';
+
+      // AI 洞察
+      const insight = document.getElementById('agentInsight');
+      let html = '<div class="ai-title">🤖 AI 分析洞察</div>';
+      if (an.summary) html += `<div class="ai-line"><b>📝 ${an.summary}</b></div>`;
+      if (an.focus_trend) html += `<div class="ai-line">📈 专注趋势：${an.focus_trend}</div>`;
+      if (an.fatigue_level) html += `<div class="ai-line">😴 疲劳程度：${an.fatigue_level}</div>`;
+      if (an.main_activity) html += `<div class="ai-line">📖 主要活动：${an.main_activity}</div>`;
+      if (an.risk_flags?.length) {
+        an.risk_flags.forEach(f => html += `<div class="ai-line risk">⚠️ ${f}</div>`);
+      }
+      if (an.suggestion) html += `<div class="ai-line good">💡 ${an.suggestion}</div>`;
+      insight.innerHTML = html;
+
+      cards.style.display = 'block';
+    }
+  } catch(e) {
+    addAgentMsg('assistant', '分析请求失败，请稍后重试。');
+  }
+  btn.textContent = '📊 分析学习状态';
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
